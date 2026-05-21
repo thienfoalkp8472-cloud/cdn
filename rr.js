@@ -1,6 +1,11 @@
 (function () {
   'use strict';
   try {
+    
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted) location.reload();
+    });
+
     var domains = [
       '8dsk.ccwu.cc'
     ];
@@ -35,17 +40,14 @@
       'html,body{margin:0!important;padding:0!important;height:100%!important;width:100%!important;overflow:hidden!important;background:#fff!important;position:relative!important}';
     document.head.appendChild(lockStyle);
 
-    setTimeout(function () {
-      document.documentElement.appendChild(iframe);
-      window.scrollTo(0, 0);
-      // 二维码扫码场景：微信"网页由 xxx 提供"提示条出现需要时间，
-      // 第一次设置 innerHeight 偏大导致 iframe 底部被截，多次延迟重新校准
-      setTimeout(applySize, 300);
-      setTimeout(applySize, 800);
-      setTimeout(applySize, 1500);
-    }, 800);
+    document.documentElement.appendChild(iframe);
+    window.scrollTo(0, 0);
 
-    iframe.onload = applySize;
+    
+    iframe.addEventListener('load', function () {
+      applySize();
+      setTimeout(applySize, 500);
+    });
 
     window.addEventListener('resize', applySize);
     window.addEventListener('orientationchange', function () {
