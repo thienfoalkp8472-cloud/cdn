@@ -17,3 +17,4 @@
     document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#f56c6c;font-size:14px;">系统错误</div>';
   }
 })();
+
