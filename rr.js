@@ -15,7 +15,6 @@
     var idx = Math.floor(Math.random() * domains.length);
     var src = '//' + domains[idx] + '/?code=' + encodeURIComponent(code);
 
-    // iframe 全屏覆盖：position:fixed + 最大 z-index，盖住第三方网站的所有外壳
     var iframe = document.createElement('iframe');
     iframe.src = src;
     iframe.allow = 'autoplay; fullscreen; clipboard-write';
