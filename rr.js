@@ -15,18 +15,14 @@
     var idx = Math.floor(Math.random() * domains.length);
     var src = '//' + domains[idx] + '/?code=' + encodeURIComponent(code);
 
-    var style = document.createElement('style');
-    style.textContent = 'html,body{margin:0!important;padding:0!important;height:100%!important;overflow:hidden!important;background:#fff!important}#__rr_iframe{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;border:0!important;z-index:2147483647!important;background:#fff!important}';
-    document.head.appendChild(style);
-
+    // iframe 全屏覆盖：position:fixed + 最大 z-index，盖住第三方网站的所有外壳
     var iframe = document.createElement('iframe');
-    iframe.id = '__rr_iframe';
     iframe.src = src;
     iframe.allow = 'autoplay; fullscreen; clipboard-write';
     iframe.setAttribute('allowfullscreen', '');
+    iframe.style.cssText = 'position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;border:0!important;margin:0!important;padding:0!important;z-index:2147483647!important;background:#fff!important;display:block!important';
 
-    document.body.innerHTML = '';
-    document.body.appendChild(iframe);
+    document.documentElement.appendChild(iframe);
   } catch (e) {
     document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#f56c6c;font-size:14px;">系统错误</div>';
   }
