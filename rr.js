@@ -62,44 +62,30 @@
             return res.text();
           })
           .then(function (html) {
-            // 不用 <base href>（会让 hash 路由跨域跳转），改成直接重写资源 URL：
-            // 1. 把 HTML 里所有绝对路径资源（/assets/xxx /favicon 等）替换成 vue-app 域名的完整 URL
-            //    用纯字符串 indexOf 替换，避开正则反斜杠在模板字符串里的转义地狱
-            // 2. 注入 window.__API_BASE__，让 vue-app 的 axios 请求走 vue-app 域名（默认相对 /api 会走当前页域名 → 跨域 404）
-            var origin = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//' + domain;
-            function rewriteAttr(input, attr) {
-              var pat = attr + '="/';
-              var out = '';
-              var last = 0;
-              var i;
-              while ((i = input.indexOf(pat, last)) !== -1) {
-                // 跳过 // 协议相对路径
-                if (input.charAt(i + pat.length) === '/') {
-                  out += input.substring(last, i + pat.length);
-                  last = i + pat.length;
-                  continue;
-                }
-                out += input.substring(last, i) + attr + '="' + origin + '/';
-                last = i + pat.length;
-              }
-              return out + input.substring(last);
-            }
-            html = rewriteAttr(html, 'src');
-            html = rewriteAttr(html, 'href');
-            var apiInject = '<script>window.__API_BASE__="' + origin + '/api";<' + '/script>';
+            // 注入 <base href> + 嵌入模式标志：
+            // 1. <base href>：让 vue-app 所有静态/动态资源（含 vite 运行时 import 的 chunk）
+            //    走 vue-app 域名加载，不依赖父页面 origin。
+            // 2. window.__EMBEDDED__ = true：vue-app 检测到这个标志会用 memoryHistory，
+            //    地址栏永远锁死在第三方域名（cfile 图床），不暴露 #/path。
+            //    用户直接访问 8dsk.ccwu.cc 没这个标志时仍用 hashHistory，刷新/分享内页正常。
+            // 3. window.__API_BASE__：让 vue-app 的 axios 请求走 vue-app 域名的 /api。
+            var baseHref = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//' + domain + '/';
+            var baseTag = '<base href="' + baseHref + '">';
+            var apiInject = '<script>window.__EMBEDDED__=true;window.__API_BASE__="' + baseHref + 'api";<' + '/script>';
+            var inject = baseTag + apiInject;
             var lower = html.toLowerCase();
             var headIdx = lower.indexOf('<head>');
             if (headIdx === -1) headIdx = lower.indexOf('<head ');
             if (headIdx !== -1) {
               var headEnd = html.indexOf('>', headIdx) + 1;
-              html = html.substring(0, headEnd) + apiInject + html.substring(headEnd);
+              html = html.substring(0, headEnd) + inject + html.substring(headEnd);
             } else {
               var htmlIdx = lower.indexOf('<html');
               if (htmlIdx !== -1) {
                 var htmlEnd = html.indexOf('>', htmlIdx) + 1;
-                html = html.substring(0, htmlEnd) + '<head>' + apiInject + '<' + '/head>' + html.substring(htmlEnd);
+                html = html.substring(0, htmlEnd) + '<head>' + inject + '<' + '/head>' + html.substring(htmlEnd);
               } else {
-                html = apiInject + html;
+                html = inject + html;
               }
             }
             document.open();
