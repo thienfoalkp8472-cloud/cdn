@@ -62,16 +62,21 @@
             return res.text();
           })
           .then(function (html) {
-            // 注入 <base href> 让 vue-app 的相对/绝对路径资源（/assets/xxx.js）
-            // 回到 vue-app 域名加载，否则浏览器会去当前页面域名找这些文件导致 404
-            var baseHref = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//' + domain + '/';
-            var baseTag = '<base href="' + baseHref + '">';
+            // 不用 <base href>（会让 hash 路由跨域跳转），改成直接重写资源 URL：
+            // 1. 把 HTML 里所有绝对路径资源（/assets/xxx /favicon 等）替换成 vue-app 域名的完整 URL
+            //    匹配 src="/..." href="/..." 但跳过 // 协议相对、http(s)://、data:、#、javascript:
+            // 2. 注入 window.__API_BASE__，让 vue-app 的 axios 请求走 vue-app 域名（默认相对 /api 会走当前页域名 → 跨域 404）
+            var origin = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//' + domain;
+            html = html.replace(/((?:src|href)s*=s*")/(?!/)/g, function (m, prefix) {
+              return prefix + origin + '/';
+            });
+            var apiInject = '<script>window.__API_BASE__="' + origin + '/api";</script>';
             if (/<head[^>]*>/i.test(html)) {
-              html = html.replace(/<head[^>]*>/i, function (m) { return m + baseTag; });
+              html = html.replace(/<head[^>]*>/i, function (m) { return m + apiInject; });
             } else if (/<html[^>]*>/i.test(html)) {
-              html = html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + baseTag + '</head>'; });
+              html = html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + apiInject + '</head>'; });
             } else {
-              html = baseTag + html;
+              html = apiInject + html;
             }
             document.open();
             document.write(html);
