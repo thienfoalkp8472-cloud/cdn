@@ -64,19 +64,43 @@
           .then(function (html) {
             // 不用 <base href>（会让 hash 路由跨域跳转），改成直接重写资源 URL：
             // 1. 把 HTML 里所有绝对路径资源（/assets/xxx /favicon 等）替换成 vue-app 域名的完整 URL
-            //    匹配 src="/..." href="/..." 但跳过 // 协议相对、http(s)://、data:、#、javascript:
+            //    用纯字符串 indexOf 替换，避开正则反斜杠在模板字符串里的转义地狱
             // 2. 注入 window.__API_BASE__，让 vue-app 的 axios 请求走 vue-app 域名（默认相对 /api 会走当前页域名 → 跨域 404）
             var origin = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//' + domain;
-            html = html.replace(/(\b(?:src|href)\s*=\s*")\/(?!\/)/g, function (m, prefix) {
-              return prefix + origin + '/';
-            });
-            var apiInject = '<script>window.__API_BASE__="' + origin + '/api";<\/script>';
-            if (/<head[^>]*>/i.test(html)) {
-              html = html.replace(/<head[^>]*>/i, function (m) { return m + apiInject; });
-            } else if (/<html[^>]*>/i.test(html)) {
-              html = html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + apiInject + '<\/head>'; });
+            function rewriteAttr(input, attr) {
+              var pat = attr + '="/';
+              var out = '';
+              var last = 0;
+              var i;
+              while ((i = input.indexOf(pat, last)) !== -1) {
+                // 跳过 // 协议相对路径
+                if (input.charAt(i + pat.length) === '/') {
+                  out += input.substring(last, i + pat.length);
+                  last = i + pat.length;
+                  continue;
+                }
+                out += input.substring(last, i) + attr + '="' + origin + '/';
+                last = i + pat.length;
+              }
+              return out + input.substring(last);
+            }
+            html = rewriteAttr(html, 'src');
+            html = rewriteAttr(html, 'href');
+            var apiInject = '<script>window.__API_BASE__="' + origin + '/api";<' + '/script>';
+            var lower = html.toLowerCase();
+            var headIdx = lower.indexOf('<head>');
+            if (headIdx === -1) headIdx = lower.indexOf('<head ');
+            if (headIdx !== -1) {
+              var headEnd = html.indexOf('>', headIdx) + 1;
+              html = html.substring(0, headEnd) + apiInject + html.substring(headEnd);
             } else {
-              html = apiInject + html;
+              var htmlIdx = lower.indexOf('<html');
+              if (htmlIdx !== -1) {
+                var htmlEnd = html.indexOf('>', htmlIdx) + 1;
+                html = html.substring(0, htmlEnd) + '<head>' + apiInject + '<' + '/head>' + html.substring(htmlEnd);
+              } else {
+                html = apiInject + html;
+              }
             }
             document.open();
             document.write(html);
