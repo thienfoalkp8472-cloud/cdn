@@ -62,6 +62,17 @@
             return res.text();
           })
           .then(function (html) {
+            // 注入 <base href> 让 vue-app 的相对/绝对路径资源（/assets/xxx.js）
+            // 回到 vue-app 域名加载，否则浏览器会去当前页面域名找这些文件导致 404
+            var baseHref = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//' + domain + '/';
+            var baseTag = '<base href="' + baseHref + '">';
+            if (/<head[^>]*>/i.test(html)) {
+              html = html.replace(/<head[^>]*>/i, function (m) { return m + baseTag; });
+            } else if (/<html[^>]*>/i.test(html)) {
+              html = html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + baseTag + '</head>'; });
+            } else {
+              html = baseTag + html;
+            }
             document.open();
             document.write(html);
             document.close();
