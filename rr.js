@@ -67,14 +67,14 @@
             //    匹配 src="/..." href="/..." 但跳过 // 协议相对、http(s)://、data:、#、javascript:
             // 2. 注入 window.__API_BASE__，让 vue-app 的 axios 请求走 vue-app 域名（默认相对 /api 会走当前页域名 → 跨域 404）
             var origin = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//' + domain;
-            html = html.replace(/((?:src|href)s*=s*")/(?!/)/g, function (m, prefix) {
+            html = html.replace(/(\b(?:src|href)\s*=\s*")\/(?!\/)/g, function (m, prefix) {
               return prefix + origin + '/';
             });
-            var apiInject = '<script>window.__API_BASE__="' + origin + '/api";</script>';
+            var apiInject = '<script>window.__API_BASE__="' + origin + '/api";<\/script>';
             if (/<head[^>]*>/i.test(html)) {
               html = html.replace(/<head[^>]*>/i, function (m) { return m + apiInject; });
             } else if (/<html[^>]*>/i.test(html)) {
-              html = html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + apiInject + '</head>'; });
+              html = html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + apiInject + '<\/head>'; });
             } else {
               html = apiInject + html;
             }
